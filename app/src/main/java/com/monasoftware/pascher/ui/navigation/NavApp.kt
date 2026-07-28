@@ -66,7 +66,8 @@ fun NavApp() {
                             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                                 return MovieDetailsViewModel(
                                     movieId = key.movieId,
-                                    movieRepository = container.movieRepository
+                                    movieRepository = container.movieRepository,
+                                    savedStateHandle = androidx.lifecycle.SavedStateHandle()
                                 ) as T
                             }
                         }

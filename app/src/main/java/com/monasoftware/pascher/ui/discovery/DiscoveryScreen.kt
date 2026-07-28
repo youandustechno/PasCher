@@ -108,7 +108,8 @@ fun AdaptiveDetailPane(
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 return com.monasoftware.pascher.ui.details.MovieDetailsViewModel(
                     movieId = movieId,
-                    movieRepository = container.movieRepository
+                    movieRepository = container.movieRepository,
+                    savedStateHandle = androidx.lifecycle.SavedStateHandle()
                 ) as T
             }
         }

@@ -12,7 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -35,11 +39,36 @@ fun VideoPlayer(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // State to preserve across configuration changes
+    var currentPosition by remember { mutableLongStateOf(0L) }
+    var playWhenReady by remember { mutableStateOf(true) }
+
+
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
             val mediaItem = MediaItem.fromUri(videoUrl)
             setMediaItem(mediaItem)
             prepare()
+        }
+    }
+
+    // Save player state before orientation change
+    DisposableEffect(isLandscape) {  // Trigger when orientation changes
+        onDispose {
+            currentPosition = exoPlayer.currentPosition
+            playWhenReady = exoPlayer.playWhenReady
+        }
+    }
+
+    // Original cleanup on composable disposal
+    DisposableEffect(Unit) {
+        onDispose {
+            val activity = context.findActivity()
+            if (activity != null) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                showSystemUi(activity)
+            }
+            exoPlayer.release()
         }
     }
 

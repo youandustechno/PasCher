@@ -1,5 +1,6 @@
 package com.monasoftware.pascher.ui.details
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.monasoftware.pascher.data.repository.MovieRepository
@@ -11,8 +12,12 @@ import kotlinx.coroutines.launch
 
 class MovieDetailsViewModel(
     private val movieId: String,
-    private val movieRepository: MovieRepository
+    private val movieRepository: MovieRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    private val _videoPlaybackPosition = MutableStateFlow(0L)
+    val videoPlaybackPosition: StateFlow<Long> = _videoPlaybackPosition.asStateFlow()
 
     private val _movie = MutableStateFlow<Movie?>(null)
     val movie: StateFlow<Movie?> = _movie.asStateFlow()
@@ -22,6 +27,15 @@ class MovieDetailsViewModel(
 
     init {
         loadMovie()
+    }
+
+    fun saveVideoPosition(position: Long) {
+        _videoPlaybackPosition.value = position
+        savedStateHandle["videoPosition_$movieId"] = position
+    }
+
+    fun getVideoPosition(): Long {
+        return savedStateHandle.get<Long>("videoPosition_$movieId") ?: 0L
     }
 
     private fun loadMovie() {
