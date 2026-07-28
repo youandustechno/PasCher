@@ -32,7 +32,6 @@ import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -55,7 +54,6 @@ fun DiscoveryScreen(
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val movies by viewModel.filteredMovies.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val scope = rememberCoroutineScope()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.Discovery
@@ -97,6 +95,7 @@ fun DiscoveryScreen(
     }
 }
 
+@Suppress("UNCHECKED_CAST")
 @Composable
 fun AdaptiveDetailPane(
     movieId: String,
@@ -116,6 +115,7 @@ fun AdaptiveDetailPane(
     )
     com.monasoftware.pascher.ui.details.MovieDetailsContent(
         movie = movieDetailsViewModel.movie.collectAsState().value ?: return,
+        exoPlayer = movieDetailsViewModel.getExoPlayer(LocalContext.current)
     )
 }
 
@@ -137,7 +137,7 @@ fun MovieDiscoveryList(
                         onValueChange = onSearchQueryChange,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 2.dp, horizontal = 5.dp),
                         placeholder = { Text("Search movies...") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         shape = MaterialTheme.shapes.medium,
@@ -176,7 +176,7 @@ fun MovieDiscoveryList(
             modifier = Modifier.fillMaxSize()
         ) {
             items(movies) { movie ->
-                MovieCard(movie = movie, onClick = { onMovieClick(movie) })
+                MovieCard(movie = movie) { onMovieClick(movie) }
             }
         }
     }

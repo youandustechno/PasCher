@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.media3.exoplayer.ExoPlayer
 import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.components.VideoPlayer
@@ -48,12 +50,10 @@ fun MovieDetailsScreen(
 
     if (isLandscape) {
         // Full immersive mode - show only video
-        movie?.let { movie ->
-            VideoPlayer(
-                videoUrl = movie.videoUrl,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        VideoPlayer(
+            exoPlayer = viewModel.getExoPlayer(LocalContext.current),
+            modifier = Modifier.fillMaxSize()
+        )
     } else {
         // Normal mode
         Scaffold(
@@ -89,6 +89,7 @@ fun MovieDetailsScreen(
                 movie?.let { movie ->
                     MovieDetailsContent(
                         movie = movie,
+                        exoPlayer = viewModel.getExoPlayer(LocalContext.current),
                         modifier = Modifier.padding(padding)
                     )
                 }
@@ -100,6 +101,7 @@ fun MovieDetailsScreen(
 @Composable
 fun MovieDetailsContent(
     movie: Movie,
+    exoPlayer: ExoPlayer,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -108,7 +110,7 @@ fun MovieDetailsContent(
             .verticalScroll(rememberScrollState())
     ) {
         VideoPlayer(
-            videoUrl = movie.videoUrl,
+            exoPlayer = exoPlayer,
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding(),

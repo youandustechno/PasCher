@@ -8,7 +8,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntry
@@ -23,9 +22,10 @@ import com.monasoftware.pascher.ui.details.MovieDetailsViewModel
 import com.monasoftware.pascher.ui.subscription.SubscriptionScreen
 import com.monasoftware.pascher.ui.subscription.SubscriptionViewModel
 
+@Suppress("UNCHECKED_CAST")
 @Composable
 fun NavApp() {
-    val backStack = remember { mutableStateListOf<NavKey>(LastRoute.route ?: NavKey.Discovery) }
+    val backStack = remember { mutableStateListOf(LastRoute.route ?: NavKey.Discovery) }
     val container = (LocalContext.current.applicationContext as PasCherApplication).container
 
     NavDisplay(
@@ -74,7 +74,10 @@ fun NavApp() {
                     )
                     MovieDetailsScreen(
                         viewModel = movieDetailsViewModel,
-                        onBackClick = { backStack.removeLastOrNull() }
+                        onBackClick = {
+                            backStack.clear()
+                            backStack.add(NavKey.Discovery)
+                        }
                     )
                 }
             }
