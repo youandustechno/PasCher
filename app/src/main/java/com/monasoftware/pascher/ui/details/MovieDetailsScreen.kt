@@ -1,11 +1,13 @@
 package com.monasoftware.pascher.ui.details
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -19,19 +21,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.statusBarsPadding
 import com.monasoftware.pascher.domain.model.Movie
+import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.components.VideoPlayer
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,17 +42,16 @@ fun MovieDetailsScreen(
 ) {
     val movie by viewModel.movie.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    var isImmersiveFullscreen by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.MovieDetail(movie?.id ?: "")
 
-    if (isImmersiveFullscreen) {
+    if (isLandscape) {
         // Full immersive mode - show only video
         movie?.let { movie ->
             VideoPlayer(
                 videoUrl = movie.videoUrl,
-                modifier = Modifier.fillMaxSize(),
-                onImmersiveFullscreenChanged = { immersive ->
-                    isImmersiveFullscreen = immersive
-                }
+                modifier = Modifier.fillMaxSize()
             )
         }
     } else {
@@ -90,10 +89,7 @@ fun MovieDetailsScreen(
                 movie?.let { movie ->
                     MovieDetailsContent(
                         movie = movie,
-                        modifier = Modifier.padding(padding),
-                        onImmersiveFullscreenChanged = { immersive ->
-                            isImmersiveFullscreen = immersive
-                        }
+                        modifier = Modifier.padding(padding)
                     )
                 }
             }
@@ -104,8 +100,7 @@ fun MovieDetailsScreen(
 @Composable
 fun MovieDetailsContent(
     movie: Movie,
-    modifier: Modifier = Modifier,
-    onImmersiveFullscreenChanged: (Boolean) -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
@@ -117,7 +112,6 @@ fun MovieDetailsContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding(),
-            onImmersiveFullscreenChanged = onImmersiveFullscreenChanged
         )
 
         Column(modifier = Modifier.padding(16.dp)) {

@@ -1,9 +1,11 @@
 package com.monasoftware.pascher.ui.discovery
 
+import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,27 +28,22 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.monasoftware.pascher.domain.model.Movie
-import kotlinx.coroutines.launch
+import com.monasoftware.pascher.ui.LastRoute
 
-// In DiscoveryScreen function, modify the ListDetailPaneScaffold:
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -59,49 +56,43 @@ fun DiscoveryScreen(
     val movies by viewModel.filteredMovies.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val scope = rememberCoroutineScope()
-    var isImmersiveFullscreen by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.Discovery
 
-    if (isImmersiveFullscreen) {
-        // Hide list pane entirely - show only the video, full screen
-        val movieId = navigator.currentDestination?.contentKey as? String
-        if (movieId != null) {
-            AdaptiveDetailPane(
-                movieId = movieId,
-                onImmersiveFullscreenChanged = { immersive -> isImmersiveFullscreen = immersive }
+    if(isLandscape) {
+        Row(Modifier.fillMaxSize()) {
+
+            MovieDiscoveryList(
+                movies = movies,
+                searchQuery = searchQuery,
+                onSearchQueryChange = viewModel::onSearchQueryChange,
+                onMovieClick = { movie ->
+                    onNavigateToDetail(movie.id)
+                },
+                onSubscriptionClick = onNavigateToSubscription
             )
-        }
-    } else {
-        ListDetailPaneScaffold(
-            directive = navigator.scaffoldDirective,
-            value = navigator.scaffoldValue,
-            listPane = {
-                MovieDiscoveryList(
-                    movies = movies,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = viewModel::onSearchQueryChange,
-                    onMovieClick = { movie ->
-                        if (navigator.scaffoldDirective.maxHorizontalPartitions > 1) {
-                            scope.launch {
-                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, movie.id)
-                            }
-                        } else {
-                            onNavigateToDetail(movie.id)
-                        }
-                    },
-                    onSubscriptionClick = onNavigateToSubscription
-                )
-            },
-            detailPane = {
-                val movieId = navigator.currentDestination?.contentKey as? String
+            Box(modifier = Modifier.weight(1f)) {
+                val movieId = navigator.currentDestination?.contentKey?: movies.firstOrNull()?.id
                 if (movieId != null) {
                     AdaptiveDetailPane(
-                        movieId = movieId,
-                        onImmersiveFullscreenChanged = { immersive -> isImmersiveFullscreen = immersive }
+                        movieId = movieId
                     )
                 } else {
                     EmptyDetailPane()
                 }
             }
+        }
+    }
+    else {
+        MovieDiscoveryList(
+            movies = movies,
+            searchQuery = searchQuery,
+            onSearchQueryChange = viewModel::onSearchQueryChange,
+            onMovieClick = { movie ->
+                onNavigateToDetail(movie.id)
+            },
+            onSubscriptionClick = onNavigateToSubscription
         )
     }
 }
@@ -109,7 +100,6 @@ fun DiscoveryScreen(
 @Composable
 fun AdaptiveDetailPane(
     movieId: String,
-    onImmersiveFullscreenChanged: (Boolean) -> Unit = {}
 ) {
     val container = (LocalContext.current.applicationContext as com.monasoftware.pascher.PasCherApplication).container
     val movieDetailsViewModel: com.monasoftware.pascher.ui.details.MovieDetailsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
@@ -125,7 +115,6 @@ fun AdaptiveDetailPane(
     )
     com.monasoftware.pascher.ui.details.MovieDetailsContent(
         movie = movieDetailsViewModel.movie.collectAsState().value ?: return,
-        onImmersiveFullscreenChanged = onImmersiveFullscreenChanged
     )
 }
 

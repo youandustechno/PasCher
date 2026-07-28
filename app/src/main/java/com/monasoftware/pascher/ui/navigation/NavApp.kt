@@ -15,6 +15,7 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import com.monasoftware.pascher.PasCherApplication
+import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.discovery.DiscoveryScreen
 import com.monasoftware.pascher.ui.discovery.DiscoveryViewModel
 import com.monasoftware.pascher.ui.details.MovieDetailsScreen
@@ -24,7 +25,7 @@ import com.monasoftware.pascher.ui.subscription.SubscriptionViewModel
 
 @Composable
 fun NavApp() {
-    val backStack = remember { mutableStateListOf<NavKey>(NavKey.Discovery) }
+    val backStack = remember { mutableStateListOf<NavKey>(LastRoute.route ?: NavKey.Discovery) }
     val container = (LocalContext.current.applicationContext as PasCherApplication).container
 
     NavDisplay(
