@@ -1,20 +1,19 @@
 package com.monasoftware.pascher.data.remote.dto
 
-import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class ArchiveSearchResponse(
-    @Json(name = "response") val response: SearchResult
+    val response: ArchiveResponseData
 )
 
 @JsonClass(generateAdapter = true)
-data class SearchResult(
-    @Json(name = "docs") val docs: List<SearchDoc>
+data class ArchiveResponseData(
+    val docs: List<ArchiveDoc>
 )
 
 @JsonClass(generateAdapter = true)
-data class SearchDoc(
-    @Json(name = "identifier") val identifier: String,
-    @Json(name = "title") val title: String? = null
+data class ArchiveDoc(
+    val identifier: String,
+    val title: String? = null
 )

@@ -2,6 +2,9 @@ package com.monasoftware.pascher.ui.discovery
 
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.util.Log
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +13,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -32,6 +38,7 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -40,8 +47,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.components.findActivity
@@ -197,18 +208,26 @@ fun MovieDiscoveryList(
 
 @Composable
 fun MovieCard(movie: Movie, onClick: () -> Unit) {
+    Log.d("Movie", movie.thumbnailUrl)
+    val context = LocalContext.current
     Card(
         modifier = Modifier
             .padding(8.dp)
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(4.dp)
     ) {
         Column {
             AsyncImage(
-                model = movie.thumbnailUrl,
+                model = ImageRequest.Builder(context)
+                    .data(movie.thumbnailUrl)
+                    .crossfade(true)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .build(),
                 contentDescription = movie.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(2f / 3f),
+                    .height(200.dp),
                 contentScale = ContentScale.Crop
             )
             Column(modifier = Modifier.padding(8.dp)) {
@@ -218,11 +237,28 @@ fun MovieCard(movie: Movie, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
+
+                Text(
+                    text = ""+movie.releaseYear,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     text = movie.genre,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+//                Text(
+//                    text = movie.genre,
+//                    style = MaterialTheme.typography.bodySmall,
+//                    color = MaterialTheme.colorScheme.secondary,
+//                    maxLines = 2,
+//                    overflow = TextOverflow.Ellipsis
+//                )
             }
         }
     }

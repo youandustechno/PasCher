@@ -10,9 +10,9 @@ interface ArchiveApiService {
 
     @GET("advancedsearch.php")
     suspend fun searchMovies(
-        @Query("q") query: String = "collection:feature_films",
+        @Query("q") query: String,
         @Query("fl[]") fields: List<String> = listOf("identifier", "title"),
-        @Query("rows") rows: Int = 50,
+        @Query("rows") rows: Int = 5,
         @Query("output") output: String = "json"
     ): ArchiveSearchResponse
 

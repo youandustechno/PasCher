@@ -38,6 +38,7 @@ class MovieDetailsViewModel(
                 if (movie != null) {
                     setMediaItem(MediaItem.fromUri(movie.videoUrl))
                     seekTo(getVideoPosition())
+                    playWhenReady = true
                     prepare()
                 }
             }
