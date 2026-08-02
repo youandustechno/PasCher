@@ -1,5 +1,6 @@
 package com.monasoftware.pascher.ui.discovery
 
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.ui.LastRoute
+import com.monasoftware.pascher.ui.components.findActivity
 
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
@@ -51,12 +54,22 @@ fun DiscoveryScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSubscription: () -> Unit
 ) {
+    val context = LocalContext.current
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val movies by viewModel.filteredMovies.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.Discovery
+
+    DisposableEffect(Unit) {
+        val activity = context.findActivity()
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
 
     if(isLandscape) {
         Row(Modifier.fillMaxSize()) {

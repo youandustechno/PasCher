@@ -40,7 +40,6 @@ fun VideoPlayer(
         onDispose {
             val activity = context.findActivity()
             if (activity != null) {
-                //activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 showSystemUi(activity)
             }
         }
@@ -120,7 +119,7 @@ fun VideoPlayer(
     )
 }
 
-private fun Context.findActivity(): Activity? = when (this) {
+fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null

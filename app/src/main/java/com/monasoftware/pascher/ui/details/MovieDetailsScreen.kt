@@ -1,6 +1,8 @@
 package com.monasoftware.pascher.ui.details
 
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,6 +38,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.components.VideoPlayer
+import com.monasoftware.pascher.ui.components.findActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,10 +46,30 @@ fun MovieDetailsScreen(
     viewModel: MovieDetailsViewModel,
     onBackClick: () -> Unit
 ) {
-    val movie by viewModel.movie.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
+    BackHandler(onBack = {
+        if (isLandscape) {
+            val activity = context.findActivity()
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            onBackClick()
+        }
+    })
+    
+    DisposableEffect(Unit) {
+        val activity = context.findActivity()
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
+
+    val movie by viewModel.movie.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.MovieDetail(movie?.id ?: "")
 
     if (isLandscape) {
