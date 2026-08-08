@@ -70,7 +70,8 @@ fun SubscriptionScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
-                )
+                ),
+                windowInsets = TopAppBarDefaults.windowInsets
             )
         }
     ) { padding ->

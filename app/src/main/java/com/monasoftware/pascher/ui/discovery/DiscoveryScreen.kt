@@ -133,7 +133,8 @@ fun DiscoveryScreen(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                    ),
+                    windowInsets = TopAppBarDefaults.windowInsets
                 )
             }
         ) { padding ->
@@ -303,7 +304,8 @@ fun MovieDiscoveryList(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
-                )
+                ),
+                windowInsets = TopAppBarDefaults.windowInsets
             )
         },
         floatingActionButton = {
