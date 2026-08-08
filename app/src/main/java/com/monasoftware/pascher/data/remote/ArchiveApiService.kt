@@ -1,5 +1,6 @@
 package com.monasoftware.pascher.data.remote
 
+import com.monasoftware.pascher.data.remote.dto.ArchiveMetadataDto
 import com.monasoftware.pascher.data.remote.dto.ArchiveMetadataResponse
 import com.monasoftware.pascher.data.remote.dto.ArchiveSearchResponse
 import retrofit2.http.GET

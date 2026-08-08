@@ -5,15 +5,16 @@ import com.monasoftware.pascher.data.local.dao.MovieDao
 import com.monasoftware.pascher.data.local.entity.toDomain
 import com.monasoftware.pascher.data.local.entity.toEntity
 import com.monasoftware.pascher.data.remote.ArchiveApiService
-import com.monasoftware.pascher.data.remote.TraktApiService
-import com.monasoftware.pascher.data.remote.dto.TraktMovieDto
+import com.monasoftware.pascher.data.remote.PublicDomainCatalog
+import com.monasoftware.pascher.data.remote.StreamingApi
+import com.monasoftware.pascher.data.remote.dto.StreamingShowDto
 import com.monasoftware.pascher.domain.model.Movie
+import com.monasoftware.pascher.domain.model.MovieCategory
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.net.URLEncoder
 
 interface MovieRepository {
     fun getMovies(): Flow<List<Movie>>
@@ -23,41 +24,62 @@ interface MovieRepository {
     suspend fun getAnticipatedMovies(): List<Movie>
     suspend fun searchMovies(query: String): List<Movie>
     suspend fun getRecommendations(token: String): List<Movie>
+    suspend fun getMoviesByCategory(category: MovieCategory): List<Movie>
+    suspend fun getPublicDomainMovies(): List<Movie>
+    suspend fun getMovieVideoUrl(movie: Movie): String?
 }
 
 class MovieRepositoryImpl(
     private val movieDao: MovieDao,
-    private val traktApiService: TraktApiService,
-    private val archiveApiService: ArchiveApiService
+    private val streamingApi: StreamingApi,
+    private val archiveApiService: ArchiveApiService,
+    private val country: String = "us",
 ) : MovieRepository {
+
+    companion object {
+        private const val MIN_RUNTIME_MINUTES = 60
+    }
 
     override fun getMovies(): Flow<List<Movie>> {
         return movieDao.getAllMovies().map { entities ->
-            entities.map { it.toDomain() }
+            entities.map { it.toDomain() }.filter { it.runtime >= MIN_RUNTIME_MINUTES }
+        }
+    }
+
+    override suspend fun getPublicDomainMovies(): List<Movie> {
+        return coroutineScope {
+            PublicDomainCatalog.entries.map { entry ->
+                async { buildMovie(entry) }
+            }.awaitAll().filterNotNull()
         }
     }
 
     override suspend fun refreshMovies() {
         try {
-            val trendingMovies = traktApiService.getTrendingMovies()
+            Log.d("MovieRepository", "Refreshing movies from streaming service...")
+            val trending = streamingApi.searchShows(country = country, orderBy = "popularity")
             val movies = coroutineScope {
-                trendingMovies.map { trendingDto ->
-                    async {
-                        trendingDto.movie.toMovie()
-                    }
-                }.awaitAll()
+                trending.shows.map { dto ->
+                    async { dto.toMovie() }
+                }.awaitAll().filter { it.runtime >= MIN_RUNTIME_MINUTES }
             }
 
             if (movies.isNotEmpty()) {
+                Log.d("MovieRepository", "Inserting ${movies.size} trending movies")
                 movieDao.clearAll()
                 movieDao.insertMovies(movies.map { it.toEntity() })
             } else {
+                Log.w("MovieRepository", "No trending movies found, using fallback")
                 insertFallbackData()
             }
         } catch (e: Exception) {
+            Log.e("MovieRepository", "Error refreshing movies", e)
             insertFallbackData()
-            e.printStackTrace()
         }
+    }
+
+    override suspend fun getMovieVideoUrl(movie: Movie): String? {
+        return findVideoUrlForMovie(movie.title)
     }
 
     private suspend fun findVideoUrlForMovie(title: String): String? {
@@ -75,26 +97,26 @@ class MovieRepositoryImpl(
     }
 
     override suspend fun getMovieById(id: String): Movie? {
-        // First try local
-        val local = movieDao.getMovieById(id)
-        if (local != null) return local.toDomain()
-        
-        // Then remote
-        return try {
-            traktApiService.getMovieDetails(id).toMovie()
-        } catch (_: Exception) {
-            null
-        }
+        return movieDao.getMovieById(id)?.toDomain()?.takeIf { it.runtime >= MIN_RUNTIME_MINUTES }
+            ?: try {
+                val dto = streamingApi.getShow(id = id, country = country)
+                dto.toMovie().takeIf { it.runtime >= MIN_RUNTIME_MINUTES }
+            } catch (e: Exception) {
+                Log.e("MovieRepository", "Error getting movie by id: $id", e)
+                null
+            }
     }
 
     override suspend fun getPopularMovies(): List<Movie> {
         return try {
             coroutineScope {
-                traktApiService.getPopularMovies().map { dto ->
+                val result = streamingApi.searchShows(country = country, orderBy = "popularity")
+                result.shows.map { dto ->
                     async { dto.toMovie() }
-                }.awaitAll()
+                }.awaitAll().filter { it.runtime >= MIN_RUNTIME_MINUTES }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("MovieRepository", "Error getting popular movies", e)
             emptyList()
         }
     }
@@ -102,11 +124,14 @@ class MovieRepositoryImpl(
     override suspend fun getAnticipatedMovies(): List<Movie> {
         return try {
             coroutineScope {
-                traktApiService.getAnticipatedMovies().map { dto ->
-                    async { dto.movie.toMovie() }
-                }.awaitAll()
+                val result = streamingApi.getChanges(country = country, changeType = "upcoming")
+                // shows is a Map<String, StreamingShowDto>
+                result.shows.values.map { dto ->
+                    async { dto.toMovie() }
+                }.awaitAll().filter { it.runtime >= MIN_RUNTIME_MINUTES }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("MovieRepository", "Error getting anticipated movies", e)
             emptyList()
         }
     }
@@ -114,46 +139,92 @@ class MovieRepositoryImpl(
     override suspend fun searchMovies(query: String): List<Movie> {
         return try {
             coroutineScope {
-                traktApiService.searchMovies(query).map { dto ->
-                    async { dto.movie.toMovie() }
-                }.awaitAll()
+                val result = streamingApi.searchByTitle(country = country, title = query)
+                result.shows.map { dto ->
+                    async { dto.toMovie() }
+                }.awaitAll().filter { it.runtime >= MIN_RUNTIME_MINUTES }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("MovieRepository", "Error searching movies for: $query", e)
             emptyList()
         }
     }
 
     override suspend fun getRecommendations(token: String): List<Movie> {
+        return emptyList()
+    }
+
+    override suspend fun getMoviesByCategory(category: MovieCategory): List<Movie> {
         return try {
-            coroutineScope {
-                traktApiService.getRecommendations(bearerToken = "Bearer $token").map { dto ->
-                    async { dto.toMovie() }
-                }.awaitAll()
+            when (category) {
+                MovieCategory.TRENDING -> getPopularMovies()
+                MovieCategory.OTHER -> getAnticipatedMovies()
+                else -> coroutineScope {
+                    val genres = category.genreSlugs.joinToString(",")
+                    val result = streamingApi.searchShows(country = country, genres = genres)
+                    result.shows.map { dto ->
+                        async { dto.toMovie() }
+                    }.awaitAll().filter { it.runtime >= MIN_RUNTIME_MINUTES }
+                }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("MovieRepository", "Error getting movies by category: $category", e)
             emptyList()
         }
     }
 
-    private suspend fun TraktMovieDto.toMovie(): Movie {
-        val videoUrl = findVideoUrlForMovie(title)
-        val thumbnailUrl = images?.poster?.firstOrNull()?.let { "https://$it" }
+    private suspend fun buildMovie(entry: PublicDomainCatalog.Entry): Movie? {
+        return try {
+            val streamingDto = streamingApi.getMovie(entry.tmdbId.toString())
+            val archiveMeta = archiveApiService.getMetadata(entry.archiveIdentifier)
 
-        Log.d("MovieRepository", "Thumbnail for '$title' -> $thumbnailUrl")
+            // Extra safety check: confirm the item actually declares a PD/open license
+            val license = archiveMeta.metadata?.title // Using title as a proxy if license missing in DTO
+            val videoFile = archiveMeta.files.find {
+                it.name.endsWith(".mp4", true) || it.name.endsWith(".ogv", true)
+            } ?: return null
+
+            val videoUrl = "https://archive.org/download/${entry.archiveIdentifier}/${videoFile.name}"
+
+            Movie(
+                id = entry.tmdbId.toString(),
+                title = streamingDto.title,
+                description = streamingDto.overview ?: "No description available.",
+                thumbnailUrl = streamingDto.imageSet?.getPoster()
+                    ?: "https://via.placeholder.com/300x450.png?text=No+Image",
+                videoUrl = videoUrl,
+                genre = streamingDto.genres?.firstOrNull()?.name ?: "Movie",
+                rating = (streamingDto.rating ?: 0.0) / 10.0,
+                releaseYear = streamingDto.releaseYear ?: 0,
+                runtime = streamingDto.runtime ?: 0,
+                isPremium = false
+            )
+        } catch (e: Exception) {
+            Log.e("MovieRepository", "Error building PD movie ${entry.title}", e)
+            null
+        }
+    }
+
+    private fun StreamingShowDto.toMovie(): Movie {
+        val posterUrl = imageSet?.getPoster()
+        val normalizedRating = (rating ?: 0.0) / 10.0
 
         return Movie(
-            id = ids.trakt.toString(),
+            id = id,
             title = title,
             description = overview ?: "No description available.",
-            thumbnailUrl = thumbnailUrl
-                ?: "https://via.placeholder.com/300x450.png?text=No+Image",
-            videoUrl = videoUrl ?: trailer ?: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-            genre = genres?.firstOrNull() ?: "Movie",
-            rating = rating ?: 0.0,
-            releaseYear = year ?: 0,
+            thumbnailUrl = posterUrl ?: "https://via.placeholder.com/300x450.png?text=No+Image",
+            videoUrl = streamingOptions[country]?.firstOrNull { it.videoLink != null }?.videoLink
+                ?: streamingOptions[country]?.firstOrNull()?.link
+                ?: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+            genre = genres?.firstOrNull()?.name ?: "Movie",
+            rating = normalizedRating,
+            releaseYear = releaseYear ?: 0,
+            runtime = runtime ?: 0,
             isPremium = false
         )
     }
+
     private suspend fun insertFallbackData() {
         val fallbackMovies = listOf(
             Movie(

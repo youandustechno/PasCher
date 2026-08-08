@@ -14,6 +14,7 @@ data class MovieEntity(
     val genre: String,
     val rating: Double,
     val releaseYear: Int,
+    val runtime: Int,
     val isPremium: Boolean
 )
 
@@ -26,6 +27,7 @@ fun MovieEntity.toDomain() = Movie(
     genre = genre,
     rating = rating,
     releaseYear = releaseYear,
+    runtime = runtime,
     isPremium = isPremium
 )
 
@@ -38,5 +40,6 @@ fun Movie.toEntity() = MovieEntity(
     genre = genre,
     rating = rating,
     releaseYear = releaseYear,
+    runtime = runtime,
     isPremium = isPremium
 )

@@ -5,7 +5,7 @@ import androidx.room.Room
 import com.monasoftware.pascher.data.local.PasCherDatabase
 import com.monasoftware.pascher.data.preferences.UserPreferencesRepository
 import com.monasoftware.pascher.data.remote.ArchiveApiService
-import com.monasoftware.pascher.data.remote.TraktApiService
+import com.monasoftware.pascher.data.remote.StreamingApi
 import com.monasoftware.pascher.data.repository.MovieRepository
 import com.monasoftware.pascher.data.repository.MovieRepositoryImpl
 import com.monasoftware.pascher.data.repository.SubscriptionRepository
@@ -14,8 +14,10 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.util.concurrent.TimeUnit
 
 interface AppContainer {
     val movieRepository: MovieRepository
@@ -29,28 +31,37 @@ class AppContainerImpl(private val context: Context) : AppContainer {
             context,
             PasCherDatabase::class.java,
             PasCherDatabase.DATABASE_NAME
-        ).build()
+        )
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
     }
 
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
 
-    private val traktInterceptor = Interceptor { chain ->
+    private val streamingApiInterceptor = Interceptor { chain ->
         val request = chain.request().newBuilder()
-            .addHeader("trakt-api-version", TraktApiService.API_VERSION)
-            .addHeader("trakt-api-key", TraktApiService.CLIENT_ID)
+            .addHeader("X-API-Key", "motn-key-v4-U0R7BPcNzPkejm45U0yONd4x4CkPC5R4")
             .build()
         chain.proceed(request)
     }
 
-    private val traktClient = OkHttpClient.Builder()
-        .addInterceptor(traktInterceptor)
+    private val loggingInterceptor = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BASIC
+    }
+
+    private val streamingClient = OkHttpClient.Builder()
+        .addInterceptor(streamingApiInterceptor)
+        .addInterceptor(loggingInterceptor)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    private val traktRetrofit = Retrofit.Builder()
-        .baseUrl(TraktApiService.BASE_URL)
-        .client(traktClient)
+    private val streamingRetrofit = Retrofit.Builder()
+        .baseUrl(StreamingApi.STREAMING_BASE_URL)
+        .client(streamingClient)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
@@ -59,8 +70,8 @@ class AppContainerImpl(private val context: Context) : AppContainer {
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
-    private val traktApiService: TraktApiService by lazy {
-        traktRetrofit.create(TraktApiService::class.java)
+    private val streamingApi: StreamingApi by lazy {
+        streamingRetrofit.create(StreamingApi::class.java)
     }
 
     private val archiveApiService: ArchiveApiService by lazy {
@@ -72,7 +83,7 @@ class AppContainerImpl(private val context: Context) : AppContainer {
     }
 
     override val movieRepository: MovieRepository by lazy {
-        MovieRepositoryImpl(database.movieDao(), traktApiService, archiveApiService)
+        MovieRepositoryImpl(database.movieDao(), streamingApi, archiveApiService)
     }
 
     override val subscriptionRepository: SubscriptionRepository by lazy {

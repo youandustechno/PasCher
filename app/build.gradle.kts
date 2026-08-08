@@ -17,6 +17,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+       // buildConfigField("String", "STREAMING_API_KEY","")
     }
 
     buildTypes {
@@ -32,6 +33,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -88,4 +90,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     "ksp"(libs.androidx.room.compiler)
     "ksp"(libs.moshi.kotlin.codegen)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 }

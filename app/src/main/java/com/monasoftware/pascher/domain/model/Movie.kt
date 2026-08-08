@@ -12,5 +12,6 @@ data class Movie(
     val genre: String,
     val rating: Double,
     val releaseYear: Int,
+    val runtime: Int = 0,
     val isPremium: Boolean = false
 )

@@ -17,3 +17,20 @@ data class ArchiveDoc(
     val identifier: String,
     val title: String? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class ArchiveMetadataResponse(
+    val metadata: ArchiveMetadata,
+    val files: List<ArchiveFile>
+)
+
+@JsonClass(generateAdapter = true)
+data class ArchiveMetadata(
+    val title: String? = null,
+    val description: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ArchiveFile(
+    val name: String
+)

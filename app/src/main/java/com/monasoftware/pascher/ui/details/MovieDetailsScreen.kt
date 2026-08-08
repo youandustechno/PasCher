@@ -24,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +38,8 @@ import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.components.VideoPlayer
 import com.monasoftware.pascher.ui.components.findActivity
+
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,15 +59,6 @@ fun MovieDetailsScreen(
             onBackClick()
         }
     })
-    
-    DisposableEffect(Unit) {
-        val activity = context.findActivity()
-        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        onDispose {
-            activity?.requestedOrientation = originalOrientation
-        }
-    }
 
     val movie by viewModel.movie.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -148,7 +140,7 @@ fun MovieDetailsContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${movie.genre} • ${movie.releaseYear} • ⭐ ${movie.rating}",
+                text = "${movie.genre} • ${movie.releaseYear} • ${movie.runtime} min • ⭐ ${String.format(Locale.getDefault(), "%.1f", movie.rating)}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.secondary
             )

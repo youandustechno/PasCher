@@ -34,8 +34,7 @@ class MovieDetailsViewModel(
     fun getExoPlayer(context: Context): ExoPlayer {
         if (exoPlayer == null) {
             exoPlayer = ExoPlayer.Builder(context.applicationContext).build().apply {
-                val movie = _movie.value
-                if (movie != null) {
+                _movie.value?.let { movie ->
                     setMediaItem(MediaItem.fromUri(movie.videoUrl))
                     seekTo(getVideoPosition())
                     playWhenReady = true
@@ -54,21 +53,36 @@ class MovieDetailsViewModel(
         return savedStateHandle.get<Long>("videoPosition_$movieId") ?: 0L
     }
 
+    private fun updatePlayer(movie: Movie) {
+        exoPlayer?.let { player ->
+            val currentUri = player.currentMediaItem?.localConfiguration?.uri?.toString()
+            if (currentUri != movie.videoUrl) {
+                val currentPos = if (player.mediaItemCount > 0) player.currentPosition else getVideoPosition()
+                player.setMediaItem(MediaItem.fromUri(movie.videoUrl))
+                player.seekTo(currentPos)
+                player.playWhenReady = true
+                player.prepare()
+            }
+        }
+    }
+
     private fun loadMovie() {
         viewModelScope.launch {
             _isLoading.value = true
             val movie = movieRepository.getMovieById(movieId)
             _movie.value = movie
             _isLoading.value = false
-            
-            // If movie is loaded and player exists, update it
-            movie?.let { 
-                exoPlayer?.let { player ->
-                    if (player.mediaItemCount == 0) {
-                        player.setMediaItem(MediaItem.fromUri(it.videoUrl))
-                        player.seekTo(getVideoPosition())
-                        player.prepare()
-                    }
+
+            movie?.let { currentMovie ->
+                // Update player if it exists
+                updatePlayer(currentMovie)
+
+                // Background fetch for high quality video URL
+                val betterUrl = movieRepository.getMovieVideoUrl(currentMovie)
+                if (betterUrl != null && betterUrl != currentMovie.videoUrl) {
+                    val updatedMovie = currentMovie.copy(videoUrl = betterUrl)
+                    _movie.value = updatedMovie
+                    updatePlayer(updatedMovie)
                 }
             }
         }

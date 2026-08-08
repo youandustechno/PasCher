@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import com.monasoftware.pascher.data.local.dao.MovieDao
 import com.monasoftware.pascher.data.local.entity.MovieEntity
 
-@Database(entities = [MovieEntity::class], version = 1, exportSchema = false)
+@Database(entities = [MovieEntity::class], version = 2, exportSchema = false)
 abstract class PasCherDatabase : RoomDatabase() {
     abstract fun movieDao(): MovieDao
 
