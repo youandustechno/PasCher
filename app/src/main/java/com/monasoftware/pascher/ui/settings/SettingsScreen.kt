@@ -17,8 +17,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -38,6 +40,8 @@ fun SettingsScreen(
     onBackClick: () -> Unit
 ) {
     val darkThemeConfig by viewModel.darkThemeConfig.collectAsState()
+    val isExperimentalFeatureEnabled by viewModel.isExperimentalFeatureEnabled.collectAsState()
+    val displayName by viewModel.displayName.collectAsState()
 
     Scaffold(
         topBar = {
@@ -59,6 +63,28 @@ fun SettingsScreen(
                 .padding(16.dp)
         ) {
             Text(
+                text = "Profile",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = displayName,
+                onValueChange = viewModel::updateDisplayName,
+                label = { Text("Display Name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Text(
+                text = "This name will be visible to others during co-watching sessions.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+            Text(
                 text = "Appearance",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
@@ -74,6 +100,40 @@ fun SettingsScreen(
                 onConfigChange = viewModel::updateDarkThemeConfig
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+            Text(
+                text = "Features",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = isExperimentalFeatureEnabled,
+                        onClick = { viewModel.toggleExperimentalFeature(!isExperimentalFeatureEnabled) },
+                        role = Role.Switch
+                    )
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Experimental Recommendations",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Enable AI-powered movie suggestions (Beta)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isExperimentalFeatureEnabled,
+                    onCheckedChange = { viewModel.toggleExperimentalFeature(it) }
+                )
+            }
         }
     }
 }

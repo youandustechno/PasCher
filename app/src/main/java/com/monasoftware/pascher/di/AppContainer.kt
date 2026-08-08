@@ -11,6 +11,8 @@ import com.monasoftware.pascher.data.repository.MovieRepository
 import com.monasoftware.pascher.data.repository.MovieRepositoryImpl
 import com.monasoftware.pascher.data.repository.SubscriptionRepository
 import com.monasoftware.pascher.data.repository.SubscriptionRepositoryImpl
+import com.monasoftware.pascher.data.watchtogether.FirebaseSignalingService
+import com.monasoftware.pascher.data.watchtogether.SignalingService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.Interceptor
@@ -24,6 +26,7 @@ interface AppContainer {
     val movieRepository: MovieRepository
     val subscriptionRepository: SubscriptionRepository
     val userPreferencesRepository: UserPreferencesRepository
+    val signalingService: SignalingService
 }
 
 class AppContainerImpl(private val context: Context) : AppContainer {
@@ -100,6 +103,10 @@ class AppContainerImpl(private val context: Context) : AppContainer {
 
     override val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context)
+    }
+
+    override val signalingService: SignalingService by lazy {
+        FirebaseSignalingService()
     }
 
     override val movieRepository: MovieRepository by lazy {

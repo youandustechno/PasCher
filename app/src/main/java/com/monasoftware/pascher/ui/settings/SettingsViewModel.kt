@@ -21,9 +21,37 @@ class SettingsViewModel(
                 initialValue = DarkThemeConfig.FOLLOW_SYSTEM
             )
 
+    val isExperimentalFeatureEnabled: StateFlow<Boolean> =
+        userPreferencesRepository.isExperimentalFeatureEnabledFlow
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = false
+            )
+
+    val displayName: StateFlow<String> =
+        userPreferencesRepository.displayNameFlow
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = ""
+            )
+
     fun updateDarkThemeConfig(darkThemeConfig: DarkThemeConfig) {
         viewModelScope.launch {
             userPreferencesRepository.setDarkThemeConfig(darkThemeConfig)
+        }
+    }
+
+    fun toggleExperimentalFeature(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setExperimentalFeatureEnabled(enabled)
+        }
+    }
+
+    fun updateDisplayName(name: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setDisplayName(name)
         }
     }
 }

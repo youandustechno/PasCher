@@ -18,6 +18,8 @@ class UserPreferencesRepository(private val context: Context) {
         val IS_SUBSCRIBED = booleanPreferencesKey("is_subscribed")
         val SELECTED_PLAN_ID = stringPreferencesKey("selected_plan_id")
         val DARK_THEME_CONFIG = stringPreferencesKey("dark_theme_config")
+        val EXPERIMENTAL_FEATURE_ENABLED = booleanPreferencesKey("experimental_feature_enabled")
+        val DISPLAY_NAME = stringPreferencesKey("display_name")
     }
 
     enum class DarkThemeConfig {
@@ -33,6 +35,28 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun setDarkThemeConfig(darkThemeConfig: DarkThemeConfig) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.DARK_THEME_CONFIG] = darkThemeConfig.name
+        }
+    }
+
+    val isExperimentalFeatureEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.EXPERIMENTAL_FEATURE_ENABLED] ?: false
+        }
+
+    suspend fun setExperimentalFeatureEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.EXPERIMENTAL_FEATURE_ENABLED] = enabled
+        }
+    }
+
+    val displayNameFlow: Flow<String> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.DISPLAY_NAME] ?: "User_${(1000..9999).random()}"
+        }
+
+    suspend fun setDisplayName(name: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DISPLAY_NAME] = name
         }
     }
 

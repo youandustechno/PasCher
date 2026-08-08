@@ -15,12 +15,15 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -56,14 +60,25 @@ import com.monasoftware.pascher.ui.discovery.DiscoveryViewModel
 fun SearchScreen(
     viewModel: DiscoveryViewModel,
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToSubscription: () -> Unit
+    onNavigateToSubscription: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val movies by viewModel.filteredMovies.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val isCoWatchingEnabled by viewModel.isCoWatchingEnabled.collectAsState()
+    val watchSession by viewModel.watchSession.collectAsState()
+    var showJoinDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.Discovery
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.navigateToMovie.collect { movieId ->
+            onNavigateToDetail(movieId)
+        }
+    }
 
     if(isLandscape) {
         Row(Modifier.fillMaxSize()) {
@@ -75,7 +90,12 @@ fun SearchScreen(
                 onMovieClick = { movie ->
                     onNavigateToDetail(movie.id)
                 },
-                onSubscriptionClick = onNavigateToSubscription
+                onSubscriptionClick = onNavigateToSubscription,
+                onSettingsClick = onNavigateToSettings,
+                isCoWatchingEnabled = isCoWatchingEnabled,
+                onJoinSessionClick = { showJoinDialog = true },
+                watchSession = watchSession,
+                onLeaveSession = viewModel::leaveSession
             )
             Box(modifier = Modifier.weight(1f)) {
                 val movieId = navigator.currentDestination?.contentKey?: movies.firstOrNull()?.id
@@ -97,7 +117,22 @@ fun SearchScreen(
             onMovieClick = { movie ->
                 onNavigateToDetail(movie.id)
             },
-            onSubscriptionClick = onNavigateToSubscription
+            onSubscriptionClick = onNavigateToSubscription,
+            onSettingsClick = onNavigateToSettings,
+            isCoWatchingEnabled = isCoWatchingEnabled,
+            onJoinSessionClick = { showJoinDialog = true },
+            watchSession = watchSession,
+            onLeaveSession = viewModel::leaveSession
+        )
+    }
+
+    if (showJoinDialog) {
+        com.monasoftware.pascher.ui.discovery.JoinSessionDialog(
+            onDismiss = { showJoinDialog = false },
+            onJoin = { code ->
+                viewModel.joinSession(code)
+                showJoinDialog = false
+            }
         )
     }
 }
@@ -115,6 +150,8 @@ fun AdaptiveDetailPane(
                 return com.monasoftware.pascher.ui.details.MovieDetailsViewModel(
                     movieId = movieId,
                     movieRepository = container.movieRepository,
+                    signalingService = container.signalingService,
+                    userPrefs = container.userPreferencesRepository,
                     savedStateHandle = androidx.lifecycle.SavedStateHandle()
                 ) as T
             }
@@ -133,7 +170,12 @@ fun MovieDiscoveryList(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onMovieClick: (Movie) -> Unit,
-    onSubscriptionClick: () -> Unit
+    onSubscriptionClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    isCoWatchingEnabled: Boolean,
+    onJoinSessionClick: () -> Unit,
+    watchSession: com.monasoftware.pascher.domain.model.WatchSession?,
+    onLeaveSession: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -157,9 +199,20 @@ fun MovieDiscoveryList(
                         singleLine = true
                     )
                 },
+                actions = {
+                    if (isCoWatchingEnabled) {
+                        IconButton(onClick = onJoinSessionClick) {
+                            Icon(Icons.Default.Group, contentDescription = "Join Session")
+                        }
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
-                )
+                ),
+                windowInsets = TopAppBarDefaults.windowInsets
             )
         },
         floatingActionButton = {
@@ -172,18 +225,26 @@ fun MovieDiscoveryList(
             }
         }
     ) { padding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 160.dp),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                top = padding.calculateTopPadding() + 16.dp,
-                end = 16.dp,
-                bottom = padding.calculateBottomPadding() + 80.dp
-            ),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(movies) { movie ->
-                MovieCard(movie = movie) { onMovieClick(movie) }
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (watchSession != null) {
+                com.monasoftware.pascher.ui.components.WatchSessionBanner(
+                    session = watchSession,
+                    onLeave = onLeaveSession
+                )
+            }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 160.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = 80.dp
+                ),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(movies) { movie ->
+                    MovieCard(movie = movie) { onMovieClick(movie) }
+                }
             }
         }
     }
@@ -235,13 +296,6 @@ fun MovieCard(movie: Movie, onClick: () -> Unit) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-//                Text(
-//                    text = movie.genre,
-//                    style = MaterialTheme.typography.bodySmall,
-//                    color = MaterialTheme.colorScheme.secondary,
-//                    maxLines = 2,
-//                    overflow = TextOverflow.Ellipsis
-//                )
             }
         }
     }

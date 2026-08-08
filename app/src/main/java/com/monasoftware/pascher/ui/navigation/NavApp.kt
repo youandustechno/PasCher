@@ -45,7 +45,11 @@ fun NavApp() {
                     val discoveryViewModel: DiscoveryViewModel = viewModel(
                         factory = object : ViewModelProvider.Factory {
                             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                                return DiscoveryViewModel(container.movieRepository) as T
+                                return DiscoveryViewModel(
+                                    movieRepository = container.movieRepository,
+                                    signalingService = container.signalingService,
+                                    userPrefs = container.userPreferencesRepository
+                                ) as T
                             }
                         }
                     )
@@ -72,6 +76,8 @@ fun NavApp() {
                                 return MovieDetailsViewModel(
                                     movieId = key.movieId,
                                     movieRepository = container.movieRepository,
+                                    signalingService = container.signalingService,
+                                    userPrefs = container.userPreferencesRepository,
                                     savedStateHandle = androidx.lifecycle.SavedStateHandle()
                                 ) as T
                             }

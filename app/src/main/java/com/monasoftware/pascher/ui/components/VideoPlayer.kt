@@ -32,19 +32,48 @@ import androidx.media3.ui.PlayerView
 fun VideoPlayer(
     exoPlayer: ExoPlayer,
     modifier: Modifier = Modifier,
+    useController: Boolean = true,
+    onPlayPause: ((Boolean) -> Unit)? = null,
+    onSeek: ((Long) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val lifecycleOwner = LocalLifecycleOwner.current
-    //var isFullscreen by remember { mutableStateOf(false) }
+
+    // Observe player events for sync
+    DisposableEffect(exoPlayer) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                onPlayPause?.invoke(isPlaying)
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: androidx.media3.common.Player.PositionInfo,
+                newPosition: androidx.media3.common.Player.PositionInfo,
+                reason: Int
+            ) {
+                if (reason == androidx.media3.common.Player.DISCONTINUITY_REASON_SEEK) {
+                    onSeek?.invoke(newPosition.contentPositionMs)
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+        }
+    }
 
     // Pause/Resume on app lifecycle
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> exoPlayer.pause()
-                Lifecycle.Event.ON_RESUME -> exoPlayer.play()
+                Lifecycle.Event.ON_RESUME -> {
+                    // Only resume automatically if we are not in co-watching mode (handled by signaling)
+                    // Or if we are the host. For simplicity, let's just resume for now.
+                    exoPlayer.play()
+                }
                 else -> {}
             }
         }
@@ -84,7 +113,14 @@ fun VideoPlayer(
         factory = { ctx ->
             PlayerView(ctx).apply {
                 player = exoPlayer
-                useController = true
+                this.useController = useController
+
+                // Completely disable interaction if not using controller (Guest mode)
+                if (!useController) {
+                    setOnClickListener(null)
+                    isClickable = false
+                    isFocusable = false
+                }
 
                 // Keep controller visible for a while so user can see the fullscreen button
                 controllerShowTimeoutMs = 3000
@@ -114,6 +150,17 @@ fun VideoPlayer(
         update = { view ->
             // Keep player attached
             view.player = exoPlayer
+            view.useController = useController
+            
+            if (!useController) {
+                view.setOnClickListener(null)
+                view.isClickable = false
+                view.isFocusable = false
+            } else {
+                // Re-enable for host
+                view.isClickable = true
+                view.isFocusable = true
+            }
 
             // Update fullscreen icon on recomposition (orientation changed)
             val fullBtnId = view.context.resources.getIdentifier("exo_fullscreen", "id", view.context.packageName)

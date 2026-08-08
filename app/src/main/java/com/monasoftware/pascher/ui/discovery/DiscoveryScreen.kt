@@ -25,10 +25,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,8 +39,10 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -45,9 +50,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +72,7 @@ import coil.request.ImageRequest
 import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.domain.model.MovieCategory
 import com.monasoftware.pascher.ui.LastRoute
+import com.monasoftware.pascher.ui.components.WatchSessionBanner
 import com.monasoftware.pascher.ui.components.findActivity
 
 
@@ -80,9 +89,19 @@ fun DiscoveryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.filteredMovies.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isCoWatchingEnabled by viewModel.isCoWatchingEnabled.collectAsState()
+    val watchSession by viewModel.watchSession.collectAsState()
+    var showJoinDialog by remember { mutableStateOf(false) }
+
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.Discovery
+
+    LaunchedEffect(Unit) {
+        viewModel.navigateToMovie.collect { movieId ->
+            onNavigateToDetail(movieId)
+        }
+    }
 
     val isSearching = searchQuery.isNotBlank()
     val allMovies = remember(categorizedMovies) { categorizedMovies.values.flatten() }
@@ -95,7 +114,11 @@ fun DiscoveryScreen(
                 onSearchQueryChange = viewModel::onSearchQueryChange,
                 onMovieClick = { movie -> onNavigateToDetail(movie.id) },
                 onSubscriptionClick = onNavigateToSubscription,
-                onSettingsClick = onNavigateToSettings
+                onSettingsClick = onNavigateToSettings,
+                isCoWatchingEnabled = isCoWatchingEnabled,
+                onJoinSessionClick = { showJoinDialog = true },
+                watchSession = watchSession,
+                onLeaveSession = viewModel::leaveSession
             )
             Box(modifier = Modifier.weight(1f)) {
                 val movieId = navigator.currentDestination?.contentKey ?: allMovies.firstOrNull()?.id
@@ -112,6 +135,11 @@ fun DiscoveryScreen(
                 TopAppBar(
                     title = { Text("PasCher") },
                     actions = {
+                        if (isCoWatchingEnabled) {
+                            IconButton(onClick = { showJoinDialog = true }) {
+                                Icon(Icons.Default.Group, contentDescription = "Join Session")
+                            }
+                        }
                         IconButton(
                             onClick = onNavigateToSubscription
                         ) {
@@ -138,53 +166,58 @@ fun DiscoveryScreen(
                 )
             }
         ) { padding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = viewModel::onSearchQueryChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        placeholder = { Text("Search movies...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        shape = MaterialTheme.shapes.medium,
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        singleLine = true
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                if (watchSession != null) {
+                    WatchSessionBanner(
+                        session = watchSession!!,
+                        onLeave = viewModel::leaveSession
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
-
-                if (isSearching) {
-                    items(searchResults, key = { it.id }) { movie ->
-                        // your existing search result row/card
-                        MovieCard(movie = movie, onClick = { onNavigateToDetail(movie.id) })
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = viewModel::onSearchQueryChange,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            placeholder = { Text("Search movies...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            shape = MaterialTheme.shapes.medium,
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-                } else {
-                    MovieCategory.values().forEach { category ->
-                        val movies = categorizedMovies[category].orEmpty()
-                        when {
-                            movies.isNotEmpty() -> item(key = category.name) {
-                                MovieCategoryRow(
-                                    title = category.displayTitle,
-                                    movies = movies,
-                                    onMovieClick = { onNavigateToDetail(it.id) }
-                                )
-                            }
 
-                            isLoading -> item(key = "${category.name}_loading") {
-                                MovieCategoryLoadingRow(title = category.displayTitle)
+                    if (isSearching) {
+                        items(searchResults, key = { it.id }) { movie ->
+                            MovieCard(movie = movie, onClick = { onNavigateToDetail(movie.id) })
+                        }
+                    } else {
+                        MovieCategory.values().forEach { category ->
+                            val movies = categorizedMovies[category].orEmpty()
+                            when {
+                                movies.isNotEmpty() -> item(key = category.name) {
+                                    MovieCategoryRow(
+                                        title = category.displayTitle,
+                                        movies = movies,
+                                        onMovieClick = { onNavigateToDetail(it.id) }
+                                    )
+                                }
+
+                                isLoading -> item(key = "${category.name}_loading") {
+                                    MovieCategoryLoadingRow(title = category.displayTitle)
+                                }
                             }
                         }
                     }
@@ -192,6 +225,55 @@ fun DiscoveryScreen(
             }
         }
     }
+
+    if (showJoinDialog) {
+        JoinSessionDialog(
+            onDismiss = { showJoinDialog = false },
+            onJoin = { code ->
+                viewModel.joinSession(code)
+                showJoinDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun JoinSessionDialog(
+    onDismiss: () -> Unit,
+    onJoin: (String) -> Unit
+) {
+    var joinCode by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Join Watch Session") },
+        text = {
+            Column {
+                Text("Enter the 6-digit code shared by your friend to start co-watching.")
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = joinCode,
+                    onValueChange = { if (it.length <= 6) joinCode = it },
+                    label = { Text("6-digit Code") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onJoin(joinCode) },
+                enabled = joinCode.length == 6
+            ) {
+                Text("Join")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 
@@ -212,7 +294,7 @@ fun MovieCategoryRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(movies, key = { it.id }) { movie ->
-                MoviePosterCard(movie = movie, onClick = { onMovieClick(movie) }) // was MovieCard
+                MoviePosterCard(movie = movie, onClick = { onMovieClick(movie) })
             }
         }
     }
@@ -254,6 +336,8 @@ fun AdaptiveDetailPane(
                 return com.monasoftware.pascher.ui.details.MovieDetailsViewModel(
                     movieId = movieId,
                     movieRepository = container.movieRepository,
+                    signalingService = container.signalingService,
+                    userPrefs = container.userPreferencesRepository,
                     savedStateHandle = androidx.lifecycle.SavedStateHandle()
                 ) as T
             }
@@ -273,7 +357,11 @@ fun MovieDiscoveryList(
     onSearchQueryChange: (String) -> Unit,
     onMovieClick: (Movie) -> Unit,
     onSubscriptionClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    isCoWatchingEnabled: Boolean,
+    onJoinSessionClick: () -> Unit,
+    watchSession: com.monasoftware.pascher.domain.model.WatchSession?,
+    onLeaveSession: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -298,6 +386,11 @@ fun MovieDiscoveryList(
                     )
                 },
                 actions = {
+                    if (isCoWatchingEnabled) {
+                        IconButton(onClick = onJoinSessionClick) {
+                            Icon(Icons.Default.Group, contentDescription = "Join Session")
+                        }
+                    }
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
@@ -318,18 +411,26 @@ fun MovieDiscoveryList(
             }
         }
     ) { padding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 160.dp),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                top = padding.calculateTopPadding() + 16.dp,
-                end = 16.dp,
-                bottom = padding.calculateBottomPadding() + 80.dp
-            ),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(movies) { movie ->
-                MovieCard(movie = movie) { onMovieClick(movie) }
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (watchSession != null) {
+                WatchSessionBanner(
+                    session = watchSession,
+                    onLeave = onLeaveSession
+                )
+            }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 160.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = 80.dp
+                ),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(movies) { movie ->
+                    MovieCard(movie = movie) { onMovieClick(movie) }
+                }
             }
         }
     }
@@ -383,13 +484,6 @@ fun MovieCard(movie: Movie, onClick: () -> Unit) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-//                Text(
-//                    text = movie.genre,
-//                    style = MaterialTheme.typography.bodySmall,
-//                    color = MaterialTheme.colorScheme.secondary,
-//                    maxLines = 2,
-//                    overflow = TextOverflow.Ellipsis
-//                )
             }
         }
     }
