@@ -8,7 +8,8 @@ data class SubscriptionPlan(
     val name: String,
     val price: Double,
     val description: String,
-    val features: List<String>
+    val features: List<String>,
+    val paypalPlanId: String = ""
 )
 
 @Serializable

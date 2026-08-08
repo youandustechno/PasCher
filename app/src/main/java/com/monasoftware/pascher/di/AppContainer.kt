@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.monasoftware.pascher.data.local.PasCherDatabase
 import com.monasoftware.pascher.data.preferences.UserPreferencesRepository
 import com.monasoftware.pascher.data.remote.ArchiveApiService
+import com.monasoftware.pascher.data.remote.PayPalService
 import com.monasoftware.pascher.data.remote.StreamingApi
 import com.monasoftware.pascher.data.repository.MovieRepository
 import com.monasoftware.pascher.data.repository.MovieRepositoryImpl
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 interface AppContainer {
     val movieRepository: MovieRepository
     val subscriptionRepository: SubscriptionRepository
+    val userPreferencesRepository: UserPreferencesRepository
 }
 
 class AppContainerImpl(private val context: Context) : AppContainer {
@@ -70,6 +72,20 @@ class AppContainerImpl(private val context: Context) : AppContainer {
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
+    // PayPal Retrofit setup
+    private val payPalClient = OkHttpClient.Builder()
+        .addInterceptor(loggingInterceptor)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private val payPalRetrofit = Retrofit.Builder()
+        .baseUrl("https://api-m.sandbox.paypal.com/") // Change to https://api-m.paypal.com/ for production
+        .client(payPalClient)
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .build()
+
     private val streamingApi: StreamingApi by lazy {
         streamingRetrofit.create(StreamingApi::class.java)
     }
@@ -78,7 +94,11 @@ class AppContainerImpl(private val context: Context) : AppContainer {
         archiveRetrofit.create(ArchiveApiService::class.java)
     }
 
-    private val userPreferencesRepository: UserPreferencesRepository by lazy {
+    private val payPalService: PayPalService by lazy {
+        payPalRetrofit.create(PayPalService::class.java)
+    }
+
+    override val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context)
     }
 
@@ -87,6 +107,6 @@ class AppContainerImpl(private val context: Context) : AppContainer {
     }
 
     override val subscriptionRepository: SubscriptionRepository by lazy {
-        SubscriptionRepositoryImpl(userPreferencesRepository)
+        SubscriptionRepositoryImpl(userPreferencesRepository, payPalService)
     }
 }

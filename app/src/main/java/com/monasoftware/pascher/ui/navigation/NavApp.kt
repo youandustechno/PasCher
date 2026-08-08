@@ -21,6 +21,8 @@ import com.monasoftware.pascher.ui.details.MovieDetailsScreen
 import com.monasoftware.pascher.ui.details.MovieDetailsViewModel
 import com.monasoftware.pascher.ui.subscription.SubscriptionScreen
 import com.monasoftware.pascher.ui.subscription.SubscriptionViewModel
+import com.monasoftware.pascher.ui.settings.SettingsScreen
+import com.monasoftware.pascher.ui.settings.SettingsViewModel
 
 @Suppress("UNCHECKED_CAST")
 @Composable
@@ -54,6 +56,9 @@ fun NavApp() {
                         },
                         onNavigateToSubscription = {
                             backStack.add(NavKey.Subscription)
+                        },
+                        onNavigateToSettings = {
+                            backStack.add(NavKey.Settings)
                         }
                     )
                 }
@@ -94,6 +99,23 @@ fun NavApp() {
                     )
                     SubscriptionScreen(
                         viewModel = subscriptionViewModel,
+                        onBackClick = { backStack.removeLastOrNull() }
+                    )
+                }
+            }
+            is NavKey.Settings -> {
+                NavEntry<NavKey>(key) {
+                    val settingsViewModel: SettingsViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                return SettingsViewModel(
+                                    userPreferencesRepository = container.userPreferencesRepository
+                                ) as T
+                            }
+                        }
+                    )
+                    SettingsScreen(
+                        viewModel = settingsViewModel,
                         onBackClick = { backStack.removeLastOrNull() }
                     )
                 }

@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.monasoftware.pascher.domain.model.SubscriptionPlan
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionScreen(
@@ -186,13 +187,12 @@ fun PlanCard(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = { onPayClick(plan) },
-                enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Pay Now")
-            }
+
+            PayPalPaymentButton(
+                plan = plan,
+                isProcessing = isProcessing,
+                onPayClick = onPayClick
+            )
         }
     }
 }
@@ -257,6 +257,23 @@ fun PaymentSuccessContent(onBackClick: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         Button(onClick = onBackClick) {
             Text("Start Watching")
+        }
+    }
+}
+
+@Composable
+fun PayPalPaymentButton(
+    plan: SubscriptionPlan,
+    isProcessing: Boolean,
+    onPayClick: (SubscriptionPlan) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = { onPayClick(plan) },
+            enabled = !isProcessing,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Subscribe with PayPal")
         }
     }
 }

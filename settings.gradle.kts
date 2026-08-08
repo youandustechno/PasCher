@@ -19,6 +19,17 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        val localProperties = java.util.Properties().apply {
+            val file = rootProject.projectDir.resolve("local.properties")
+            if (file.exists()) load(file.inputStream())
+        }
+        maven {
+            url = uri("https://cardinalcommerceprod.jfrog.io/artifactory/android")
+            credentials {
+                username = localProperties.getProperty("cardinal.username")
+                password = localProperties.getProperty("cardinal.password")
+            }
+        }
     }
 }
 

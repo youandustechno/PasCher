@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Card
@@ -33,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -43,7 +45,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -71,7 +72,8 @@ import com.monasoftware.pascher.ui.components.findActivity
 fun DiscoveryScreen(
     viewModel: DiscoveryViewModel,
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToSubscription: () -> Unit
+    onNavigateToSubscription: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val categorizedMovies by viewModel.categorizedMovies.collectAsState()
@@ -92,7 +94,8 @@ fun DiscoveryScreen(
                 searchQuery = searchQuery,
                 onSearchQueryChange = viewModel::onSearchQueryChange,
                 onMovieClick = { movie -> onNavigateToDetail(movie.id) },
-                onSubscriptionClick = onNavigateToSubscription
+                onSubscriptionClick = onNavigateToSubscription,
+                onSettingsClick = onNavigateToSettings
             )
             Box(modifier = Modifier.weight(1f)) {
                 val movieId = navigator.currentDestination?.contentKey ?: allMovies.firstOrNull()?.id
@@ -104,50 +107,84 @@ fun DiscoveryScreen(
             }
         }
     } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                TextField(
-                    value = searchQuery,
-                    onValueChange = viewModel::onSearchQueryChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    placeholder = { Text("Search movies...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    shape = MaterialTheme.shapes.medium,
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            if (isSearching) {
-                items(searchResults, key = { it.id }) { movie ->
-                    // your existing search result row/card
-                    MovieCard(movie = movie, onClick = { onNavigateToDetail(movie.id) })
-                }
-            } else {
-                MovieCategory.values().forEach { category ->
-                    val movies = categorizedMovies[category].orEmpty()
-                    when {
-                        movies.isNotEmpty() -> item(key = category.name) {
-                            MovieCategoryRow(
-                                title = category.displayTitle,
-                                movies = movies,
-                                onMovieClick = { onNavigateToDetail(it.id) }
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("PasCher") },
+                    actions = {
+                        IconButton(
+                            onClick = onNavigateToSubscription
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "Subscriptions",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                        isLoading -> item(key = "${category.name}_loading") {
-                            MovieCategoryLoadingRow(title = category.displayTitle)
+                        IconButton(
+                            onClick = onNavigateToSettings
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(bottom = 80.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = viewModel::onSearchQueryChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        placeholder = { Text("Search movies...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        shape = MaterialTheme.shapes.medium,
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (isSearching) {
+                    items(searchResults, key = { it.id }) { movie ->
+                        // your existing search result row/card
+                        MovieCard(movie = movie, onClick = { onNavigateToDetail(movie.id) })
+                    }
+                } else {
+                    MovieCategory.values().forEach { category ->
+                        val movies = categorizedMovies[category].orEmpty()
+                        when {
+                            movies.isNotEmpty() -> item(key = category.name) {
+                                MovieCategoryRow(
+                                    title = category.displayTitle,
+                                    movies = movies,
+                                    onMovieClick = { onNavigateToDetail(it.id) }
+                                )
+                            }
+
+                            isLoading -> item(key = "${category.name}_loading") {
+                                MovieCategoryLoadingRow(title = category.displayTitle)
+                            }
                         }
                     }
                 }
@@ -234,7 +271,8 @@ fun MovieDiscoveryList(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onMovieClick: (Movie) -> Unit,
-    onSubscriptionClick: () -> Unit
+    onSubscriptionClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -257,6 +295,11 @@ fun MovieDiscoveryList(
                         ),
                         singleLine = true
                     )
+                },
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background

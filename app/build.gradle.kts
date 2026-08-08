@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
+    implementation(libs.paypal.checkout)
     testImplementation(libs.androidx.core)
     testImplementation(libs.androidx.junit)
     testImplementation(libs.junit)
@@ -90,5 +91,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     "ksp"(libs.androidx.room.compiler)
     "ksp"(libs.moshi.kotlin.codegen)
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 }

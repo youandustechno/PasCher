@@ -17,6 +17,23 @@ class UserPreferencesRepository(private val context: Context) {
     private object PreferencesKeys {
         val IS_SUBSCRIBED = booleanPreferencesKey("is_subscribed")
         val SELECTED_PLAN_ID = stringPreferencesKey("selected_plan_id")
+        val DARK_THEME_CONFIG = stringPreferencesKey("dark_theme_config")
+    }
+
+    enum class DarkThemeConfig {
+        FOLLOW_SYSTEM, LIGHT, DARK
+    }
+
+    val darkThemeConfigFlow: Flow<DarkThemeConfig> = context.dataStore.data
+        .map { preferences ->
+            val configName = preferences[PreferencesKeys.DARK_THEME_CONFIG] ?: DarkThemeConfig.FOLLOW_SYSTEM.name
+            DarkThemeConfig.valueOf(configName)
+        }
+
+    suspend fun setDarkThemeConfig(darkThemeConfig: DarkThemeConfig) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DARK_THEME_CONFIG] = darkThemeConfig.name
+        }
     }
 
     val isSubscribedFlow: Flow<Boolean> = context.dataStore.data

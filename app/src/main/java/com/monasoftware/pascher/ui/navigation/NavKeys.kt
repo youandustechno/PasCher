@@ -12,4 +12,7 @@ sealed interface NavKey {
 
     @Serializable
     data object Subscription : NavKey
+
+    @Serializable
+    data object Settings : NavKey
 }
