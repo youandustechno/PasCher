@@ -2,6 +2,7 @@ package com.monasoftware.pascher.ui.details
 
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,12 +30,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,15 +48,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
+import com.google.android.material.snackbar.Snackbar
 import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.domain.model.WatchSession
 import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.components.VideoPlayer
 import com.monasoftware.pascher.ui.components.WatchSessionBanner
 import com.monasoftware.pascher.ui.components.findActivity
+import com.monasoftware.pascher.ui.navigation.NavKey
 
 import java.util.Locale
 
@@ -81,12 +88,31 @@ fun MovieDetailsScreen(
     val isCoWatchingEnabled by viewModel.isCoWatchingEnabled.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val joinError by viewModel.joinError.collectAsState()
+    val isStartingSession by viewModel.isStartingSession.collectAsState()
     var showWatchTogetherDialog by remember { mutableStateOf(false) }
+    val view = LocalView.current
+    var currentSnackBar by remember { mutableStateOf<Snackbar?>(null) }
 
     val isHost = watchSession?.hostName == currentUserName
     val isCoWatching = watchSession != null
 
-    LastRoute.route = com.monasoftware.pascher.ui.navigation.NavKey.MovieDetail(movie?.id ?: "")
+    LaunchedEffect(watchSession) {
+        val id = watchSession?.sessionId
+        if (isCoWatching && !id.isNullOrEmpty()) {
+            LastRoute.currentSessionId = id.ifEmpty { LastRoute.currentSessionId }
+            val snackbar = Snackbar.make(view, "Co-watching session active: $id", Snackbar.LENGTH_INDEFINITE)
+                .setAction("Close") {
+                    currentSnackBar?.dismiss()
+                }
+            snackbar.show()
+            currentSnackBar = snackbar
+        } else {
+            currentSnackBar?.dismiss()
+            currentSnackBar = null
+        }
+    }
+
+    LastRoute.route = NavKey.MovieDetail(movie?.id ?: "")
 
     if (joinError != null) {
         AlertDialog(
@@ -174,13 +200,17 @@ fun MovieDetailsScreen(
                 movie?.let { movie ->
                     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
                         if (watchSession != null) {
+                            Log.d("MovieDetailsScreen", "Rendering WatchSessionBanner for session: ${watchSession!!.sessionId}")
                             WatchSessionBanner(session = watchSession!!, onLeave = viewModel::leaveWatchTogether)
+                        } else {
+                            Log.d("MovieDetailsScreen", "watchSession is NULL - banner will not render")
                         }
                         MovieDetailsContent(
                             movie = movie,
                             exoPlayer = viewModel.getExoPlayer(LocalContext.current),
                             useController = !isCoWatching || isHost,
                             onPlayPause = viewModel::onLocalPlayPause,
+                            id = watchSession?.sessionId,
                             onSeek = viewModel::onLocalSeek,
                             modifier = Modifier.weight(1f)
                         )
@@ -194,6 +224,7 @@ fun MovieDetailsScreen(
         WatchTogetherDialog(
             session = watchSession,
             currentUserName = currentUserName,
+            isStartingSession = isStartingSession,
             onDismiss = { showWatchTogetherDialog = false },
             onCreateSession = {
                 viewModel.startWatchTogether()
@@ -212,6 +243,7 @@ fun MovieDetailsScreen(
 fun WatchTogetherDialog(
     session: WatchSession?,
     currentUserName: String,
+    isStartingSession: Boolean,
     onDismiss: () -> Unit,
     onCreateSession: () -> Unit,
     onJoinSession: (String) -> Unit,
@@ -224,8 +256,11 @@ fun WatchTogetherDialog(
         onDismissRequest = onDismiss,
         title = { Text("Watch Together") },
         text = {
-            Column {
-                if (session == null) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (isStartingSession) {
+                    CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+                    Text("Setting up your session...")
+                } else if (session == null) {
                     Text("Start a new session to invite friends, or join an existing one with a code. (Max 5 people)")
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
@@ -305,9 +340,14 @@ fun MovieDetailsContent(
     exoPlayer: ExoPlayer,
     modifier: Modifier = Modifier,
     useController: Boolean = true,
+    id: String? = null,
     onPlayPause: ((Boolean) -> Unit)? = null,
-    onSeek: ((Long) -> Unit)? = null
+    onSeek: ((Long) -> Unit)? = null,
 ) {
+    val ids = id ?: LastRoute.currentSessionId
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -321,7 +361,27 @@ fun MovieDetailsContent(
             onSeek = onSeek
         )
 
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
+            .padding(16.dp)) {
+
+            if (ids.isNotBlank() && !isLandscape) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Text(
+                        text = "Co-Watching ID: $ids",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
             Text(
                 text = movie.title,
                 style = MaterialTheme.typography.headlineMedium,

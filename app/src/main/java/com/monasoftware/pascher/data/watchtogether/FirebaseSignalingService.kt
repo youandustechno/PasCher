@@ -1,5 +1,7 @@
 package com.monasoftware.pascher.data.watchtogether
 
+import android.util.Log
+import android.widget.Toast
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -14,9 +16,14 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 
-class FirebaseSignalingService : SignalingService {
+class FirebaseSignalingService(private val context: android.content.Context) : SignalingService {
 
+    private val TAG = "FirebaseSignaling"
     private val database = FirebaseDatabase.getInstance().reference.child("sessions")
+
+    init {
+        Log.d(TAG, "Initialized FirebaseSignalingService with DB: ${database.toString()}")
+    }
 
     private val _currentSession = MutableStateFlow<WatchSession?>(null)
     override val currentSession: Flow<WatchSession?> = _currentSession.asStateFlow()
@@ -29,6 +36,7 @@ class FirebaseSignalingService : SignalingService {
     private var currentSessionId: String? = null
 
     override suspend fun createSession(hostName: String, movieId: String, movieTitle: String, movieUrl: String): String {
+        Log.d(TAG, "Creating session for movie: $movieTitle")
         val sessionId = (100000..999999).random().toString()
         val session = WatchSession(
             sessionId = sessionId,
@@ -39,33 +47,56 @@ class FirebaseSignalingService : SignalingService {
             participants = listOf(hostName)
         )
 
-        database.child(sessionId).setValue(session).await()
-        currentSessionId = sessionId
-        _currentSession.value = session
-        observeSession(sessionId)
-        return sessionId
+        try {
+            database.child(sessionId).setValue(session).await()
+            Log.d(TAG, "Session $sessionId successfully created in Firebase")
+            currentSessionId = sessionId
+            _currentSession.value = session
+            
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Toast.makeText(context, "Watch Together session started: $sessionId", Toast.LENGTH_LONG).show()
+            }
+            
+            Log.d(TAG, "Local _currentSession updated: ${session.sessionId}")
+            observeSession(sessionId)
+            return sessionId
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create session in Firebase", e)
+            throw e
+        }
     }
 
     override suspend fun joinSession(sessionId: String, participantName: String): Boolean {
-        val snapshot = database.child(sessionId).get().await()
-        if (!snapshot.exists()) return false
+        Log.d(TAG, "Attempting to join session: $sessionId")
+        try {
+            val snapshot = database.child(sessionId).get().await()
+            if (!snapshot.exists()) {
+                Log.w(TAG, "Join failed: Session $sessionId does not exist")
+                return false
+            }
 
-        val session = snapshot.getValue(WatchSession::class.java) ?: return false
-        val participants = session.participants.toMutableList()
+            val session = snapshot.getValue(WatchSession::class.java) ?: return false
+            val participants = session.participants.toMutableList()
 
-        if (participants.size >= 5 && !participants.contains(participantName)) {
-            return false // Session full
+            if (participants.size >= 5 && !participants.contains(participantName)) {
+                Log.w(TAG, "Join failed: Session $sessionId is full")
+                return false // Session full
+            }
+
+            if (!participants.contains(participantName)) {
+                participants.add(participantName)
+                database.child(sessionId).child("participants").setValue(participants).await()
+            }
+
+            Log.d(TAG, "Successfully joined session: $sessionId")
+            currentSessionId = sessionId
+            _currentSession.value = session.copy(participants = participants)
+            observeSession(sessionId)
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error joining session $sessionId", e)
+            return false
         }
-
-        if (!participants.contains(participantName)) {
-            participants.add(participantName)
-            database.child(sessionId).child("participants").setValue(participants).await()
-        }
-
-        currentSessionId = sessionId
-        _currentSession.value = session.copy(participants = participants)
-        observeSession(sessionId)
-        return true
     }
 
     override suspend fun leaveSession() {
@@ -111,11 +142,23 @@ class FirebaseSignalingService : SignalingService {
 
         val sListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val session = snapshot.getValue(WatchSession::class.java)
-                _currentSession.value = session
+                Log.d(TAG, "onDataChange: Session data received for $sessionId. raw: ${snapshot.value}")
+                try {
+                    val session = snapshot.getValue(WatchSession::class.java)
+                    if (session == null) {
+                        Log.w(TAG, "onDataChange: Received NULL session for $sessionId")
+                    } else {
+                        Log.d(TAG, "onDataChange: Session updated - ID: ${session.sessionId}, participants: ${session.participants.size}")
+                        _currentSession.value = session
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "onDataChange: Deserialization failed for $sessionId", e)
+                }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "onCancelled: Session listener failed", error.toException())
+            }
         }
         sessionListener = sListener
         database.child(sessionId).addValueEventListener(sListener)

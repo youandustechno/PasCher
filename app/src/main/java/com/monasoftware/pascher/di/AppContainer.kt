@@ -106,7 +106,7 @@ class AppContainerImpl(private val context: Context) : AppContainer {
     }
 
     override val signalingService: SignalingService by lazy {
-        FirebaseSignalingService()
+        FirebaseSignalingService(context)
     }
 
     override val movieRepository: MovieRepository by lazy {

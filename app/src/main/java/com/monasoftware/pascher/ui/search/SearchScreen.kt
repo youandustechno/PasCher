@@ -52,6 +52,7 @@ import coil.request.ImageRequest
 import com.monasoftware.pascher.domain.model.Movie
 import com.monasoftware.pascher.ui.LastRoute
 import com.monasoftware.pascher.ui.components.findActivity
+import com.monasoftware.pascher.ui.details.MovieDetailsContent
 import com.monasoftware.pascher.ui.discovery.DiscoveryViewModel
 
 
@@ -157,10 +158,21 @@ fun AdaptiveDetailPane(
             }
         }
     )
-    com.monasoftware.pascher.ui.details.MovieDetailsContent(
-        movie = movieDetailsViewModel.movie.collectAsState().value ?: return,
-        exoPlayer = movieDetailsViewModel.getExoPlayer(LocalContext.current)
-    )
+    val watchSession by movieDetailsViewModel.watchSession.collectAsState()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (watchSession != null) {
+            com.monasoftware.pascher.ui.components.WatchSessionBanner(
+                session = watchSession!!,
+                onLeave = movieDetailsViewModel::leaveWatchTogether
+            )
+        }
+        MovieDetailsContent(
+            movie = movieDetailsViewModel.movie.collectAsState().value ?: return,
+            exoPlayer = movieDetailsViewModel.getExoPlayer(LocalContext.current),
+            id = watchSession?.sessionId
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

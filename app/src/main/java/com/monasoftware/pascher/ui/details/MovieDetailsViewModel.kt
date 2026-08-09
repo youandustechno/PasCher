@@ -1,6 +1,7 @@
 package com.monasoftware.pascher.ui.details
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -47,6 +48,9 @@ class MovieDetailsViewModel(
     private val _joinError = MutableStateFlow<String?>(null)
     val joinError: StateFlow<String?> = _joinError.asStateFlow()
 
+    private val _isStartingSession = MutableStateFlow(false)
+    val isStartingSession: StateFlow<Boolean> = _isStartingSession.asStateFlow()
+
     val watchSession: StateFlow<WatchSession?> = signalingService.currentSession
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -65,6 +69,7 @@ class MovieDetailsViewModel(
     private fun observeSessionForSync() {
         viewModelScope.launch {
             watchSession.collectLatest { session ->
+                Log.d("MovieDetailsVM", "WatchSession update: ${session?.sessionId ?: "NULL"}")
                 if (session != null) {
                     val userName = userPrefs.displayNameFlow.first()
                     // If we are in a session but our name is gone, we've been dropped or left
@@ -175,9 +180,16 @@ class MovieDetailsViewModel(
 
     fun startWatchTogether() {
         viewModelScope.launch {
-            val userName = userPrefs.displayNameFlow.first()
-            val movie = _movie.value ?: return@launch
-            signalingService.createSession(userName, movie.id, movie.title, movie.videoUrl)
+            _isStartingSession.value = true
+            try {
+                val userName = userPrefs.displayNameFlow.first()
+                val movie = _movie.value ?: return@launch
+                signalingService.createSession(userName, movie.id, movie.title, movie.videoUrl)
+            } catch (e: Exception) {
+                _joinError.value = "Failed to start co-watching session: ${e.message}"
+            } finally {
+                _isStartingSession.value = false
+            }
         }
     }
 
